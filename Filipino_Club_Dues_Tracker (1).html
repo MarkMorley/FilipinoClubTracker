@@ -241,7 +241,7 @@ tbody tr:hover {
     <h1>Filipino Club</h1>
     <p>Sign in to access the dues tracker.</p>
     <form class="form" id="loginForm">
-      <label>Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Username<input id="loginUsername" type="text" autocomplete="username" required></label>
       <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
       <div class="login-error" id="loginError" role="alert"></div>
       <button class="primary" id="loginButton" type="submit">Sign in</button>
@@ -566,11 +566,23 @@ document.getElementById("loginForm").addEventListener("submit", async event => {
   button.disabled = true;
   errorBox.textContent = "";
   try {
-    const { error } = await db.auth.signInWithPassword({
-      email: document.getElementById("loginEmail").value.trim(),
-      password: document.getElementById("loginPassword").value
+    const { data, error } = await db.functions.invoke("login-by-username", {
+      body: {
+        username: document.getElementById("loginUsername").value.trim(),
+        password: document.getElementById("loginPassword").value
+      }
     });
-    if (error) errorBox.textContent = "Sign-in failed: " + error.message;
+    if (error) {
+      errorBox.textContent = "Sign-in failed: " + error.message;
+    } else if (!data?.access_token || !data?.refresh_token) {
+      errorBox.textContent = "Sign-in failed: the login function did not return a valid session.";
+    } else {
+      const { error: sessionError } = await db.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+      if (sessionError) errorBox.textContent = "Sign-in failed: " + sessionError.message;
+    }
   } catch (error) {
     errorBox.textContent = "Sign-in failed: " + (error instanceof Error ? error.message : String(error));
   } finally {
